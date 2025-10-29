@@ -150,7 +150,11 @@ struct HealthCheckView: View {
         }
 
         let ftsCount: Int = try await dbQueue.read { db in
-            try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM doc_chunks_fts WHERE docid IN (SELECT rowid FROM doc_chunks WHERE source_id IN (?, ?, ?))", arguments: arguments) ?? 0
+            try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM doc_chunks_fts WHERE rowid IN (SELECT rowid FROM doc_chunks WHERE source_id IN (?, ?, ?))",
+                arguments: arguments
+            ) ?? 0
         }
 
         guard ftsCount == expectedChunks else {
@@ -165,11 +169,11 @@ struct HealthCheckView: View {
             throw HealthCheckFailure("No foundation-model prefixes found for recent ingests.")
         }
 
-        appendLog("Database verification passed.")
+        await appendLog("Database verification passed.")
     }
 
     private func verifyEmbeddings() async throws {
-        appendLog("Verifying embedding model…")
+        await appendLog("Verifying embedding model…")
         guard let tokenizerURL = Bundle.main.url(forResource: "QwenTokenizer", withExtension: nil) else {
             throw HealthCheckFailure("Tokenizer resources missing in bundle.")
         }
