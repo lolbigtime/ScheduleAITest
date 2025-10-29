@@ -1,0 +1,35 @@
+
+build/
+Build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# SwiftPM
+.swiftpm/
+.build/
+
+# CocoaPods
+Pods/
+*.xcworkspace
+
+# Carthage
+Carthage/Build/
+
+# -------- ML / Model files --------
+*.gguf
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.tflite
+*.mlmodelc
+*.mlmodel
+
+# If you keep models in a folder (adjust as needed)
+Models/
+Resources/Models/
+ScheduleAI/Resources/Models/
