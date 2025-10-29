@@ -22,6 +22,29 @@ public enum EngineError: Error, Equatable {
     case ingestError
 }
 
+public enum EngineInitializationError: Error, LocalizedError {
+    case directoryCreationFailed(URL, underlying: String)
+    case missingTokenizer
+    case missingEmbeddingModel
+    case embedderInitializationFailed(String)
+    case folioInitializationFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .directoryCreationFailed(url, underlying):
+            return "Failed to create directory at \(url.path): \(underlying)"
+        case .missingTokenizer:
+            return "Missing tokenizer folder in app bundle"
+        case .missingEmbeddingModel:
+            return "Missing qwenEmbedding model in app bundle"
+        case let .embedderInitializationFailed(message):
+            return "Failed to initialize embedding model: \(message)"
+        case let .folioInitializationFailed(message):
+            return "Failed to initialize Folio engine: \(message)"
+        }
+    }
+}
+
 public enum SearchMode {
     case semantic
     case withContext(expand: Int)
@@ -143,39 +166,50 @@ public class Engine: ObservableObject {
     
     
 
-    public init() async {
+    public init() async throws {
         let fileManager = FileManager.default
         let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        
+
         let folioDir = appSupport.appendingPathComponent("Folio", isDirectory: true)
         let docsDir = appSupport.appendingPathComponent("Docs", isDirectory: true)
-        
-        try? fileManager.createDirectory(at: folioDir, withIntermediateDirectories: true)
-        try? fileManager.createDirectory(at: docsDir, withIntermediateDirectories: true)
-        
+
+        do {
+            try fileManager.createDirectory(at: folioDir, withIntermediateDirectories: true)
+        } catch {
+            throw EngineInitializationError.directoryCreationFailed(folioDir, underlying: error.localizedDescription)
+        }
+
+        do {
+            try fileManager.createDirectory(at: docsDir, withIntermediateDirectories: true)
+        } catch {
+            throw EngineInitializationError.directoryCreationFailed(docsDir, underlying: error.localizedDescription)
+        }
+
         let dbURL = folioDir.appendingPathComponent("folio.sqlite")
-        
-        
+
+
         let pdfLoader = PDFDocumentLoader()
         let textLoader = TextDocumentLoader()
         let chunker = UniversalChunker()
-        
-        
-        
+
+
+
         guard let tokenizerURL = Bundle.main.url(forResource: "QwenTokenizer", withExtension: nil) else {
-            fatalError("Missing tokenizer folder in app bundle")
+            throw EngineInitializationError.missingTokenizer
         }
-        
+
         let qwenURL: URL
         if let url = Bundle.main.url(forResource: "qwenEmbedding", withExtension: "mlmodelc") {
             qwenURL = url
         } else if let url = Bundle.main.url(forResource: "qwenEmbedding", withExtension: "mlpackage") {
             qwenURL = url
         } else {
-            fatalError("Missing qwenEmbedding.mlmodelc in app bundle. Ensure the model is added to the app target and included in Copy Bundle Resources.")
+            throw EngineInitializationError.missingEmbeddingModel
         }
-        
+
         let qwenOutputName = "var_3996"
+
+        let log = Logger(subsystem: "ScheduleAI", category: "Engine")
 
         do {
             let qwen = try await QwenCoreMLEmbedder(
@@ -188,16 +222,16 @@ public class Engine: ObservableObject {
 
             self.folio = try FolioEngine(databaseURL: dbURL, loaders: [pdfLoader, textLoader], chunker: chunker, embedder: qwen)
         } catch {
-            let log = Logger(subsystem: "ScheduleAI", category: "Engine")
             log.error("Init failed: \(error.localizedDescription, privacy: .public)")
-            // Also dump more detail:
-            print("FULL ERROR:", error)
-            assertionFailure("Init failed: \(error)")
-            fatalError("Init failed")
+            if error is FolioError {
+                throw EngineInitializationError.folioInitializationFailed(error.localizedDescription)
+            } else {
+                throw EngineInitializationError.embedderInitializationFailed(error.localizedDescription)
+            }
         }
-        
+
         var config = FolioConfig()
-        
+
         config.indexing.useFoundationModelPrefixes()
         config.chunking.maxTokensPerChunk = 1000
         config.chunking.overlapTokens = 150

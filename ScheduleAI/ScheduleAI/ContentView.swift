@@ -97,6 +97,18 @@ struct ContentView: View {
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color(.secondarySystemBackground)))
                         }
                     }
+
+                    Divider()
+
+                    Group {
+                        Text("Diagnostics").font(.headline)
+                        NavigationLink {
+                            HealthCheckView()
+                        } label: {
+                            Label("Open RAG Health Check", systemImage: "stethoscope")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
                 .padding()
             }
