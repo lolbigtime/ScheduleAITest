@@ -11,7 +11,7 @@ import SwiftUI
 struct ScheduleAIApp: App {
     var body: some Scene {
         WindowGroup {
-            HealthCheckView()
+            ContentView()
         }
     }
 }

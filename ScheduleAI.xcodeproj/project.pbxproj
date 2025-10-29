@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		431712BF2EB2D0C600D5D218 /* QwenTokenizer in Resources */ = {isa = PBXBuildFile; fileRef = 431712BE2EB2D0C600D5D218 /* QwenTokenizer */; };
 		43291AC62EA2D59F0024F77C /* Hub in Frameworks */ = {isa = PBXBuildFile; productRef = 43291AC52EA2D59F0024F77C /* Hub */; };
 		43291AC82EA2D59F0024F77C /* Tokenizers in Frameworks */ = {isa = PBXBuildFile; productRef = 43291AC72EA2D59F0024F77C /* Tokenizers */; };
 		43291ACA2EA2D59F0024F77C /* Transformers in Frameworks */ = {isa = PBXBuildFile; productRef = 43291AC92EA2D59F0024F77C /* Transformers */; };
@@ -14,12 +15,33 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		431712BE2EB2D0C600D5D218 /* QwenTokenizer */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QwenTokenizer; path = ScheduleAI/QwenTokenizer; sourceTree = "<group>"; };
 		437773402E8CF1DE0026431B /* ScheduleAI.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ScheduleAI.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		431712B42EB2D06A00D5D218 /* Exceptions for "ScheduleAI" folder in "ScheduleAI" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				QwenTokenizer/config_sentence_transformers.json,
+				QwenTokenizer/config.json,
+				QwenTokenizer/generation_config.json,
+				QwenTokenizer/merges.txt,
+				QwenTokenizer/modules.json,
+				QwenTokenizer/tokenizer_config.json,
+				QwenTokenizer/tokenizer.json,
+				QwenTokenizer/vocab.json,
+			);
+			target = 4377733F2E8CF1DE0026431B /* ScheduleAI */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		437773422E8CF1DE0026431B /* ScheduleAI */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				431712B42EB2D06A00D5D218 /* Exceptions for "ScheduleAI" folder in "ScheduleAI" target */,
+			);
 			path = ScheduleAI;
 			sourceTree = "<group>";
 		};
@@ -43,6 +65,7 @@
 		437773372E8CF1DE0026431B = {
 			isa = PBXGroup;
 			children = (
+				431712BE2EB2D0C600D5D218 /* QwenTokenizer */,
 				437773422E8CF1DE0026431B /* ScheduleAI */,
 				437773412E8CF1DE0026431B /* Products */,
 			);
@@ -128,6 +151,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				431712BF2EB2D0C600D5D218 /* QwenTokenizer in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
