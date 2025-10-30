@@ -108,6 +108,13 @@ struct ContentView: View {
                             Label("Open RAG Health Check", systemImage: "stethoscope")
                         }
                         .buttonStyle(.borderedProminent)
+
+                        NavigationLink {
+                            LLMTestView()
+                        } label: {
+                            Label("Open LLM Tool Test", systemImage: "brain.head.profile")
+                        }
+                        .buttonStyle(.bordered)
                     }
                 }
                 .padding()
