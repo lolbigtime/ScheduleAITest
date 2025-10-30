@@ -43,33 +43,21 @@ public struct RagSearchTool: Tool {
     
     public func call(arguments: Arguments) async throws -> [RetrievedResult] {
         let engine = try await Engine.shared()
-        switch arguments.mode {
+        let sanitizedTopK = max(1, min(arguments.top_k, 25))
+        let mode = sanitize(arguments.mode)
+        return try engine.search(arguments.query, in: arguments.in_, topK: sanitizedTopK, mode: mode)
+    }
+
+    private func sanitize(_ mode: SearchMode) -> SearchMode {
+        switch mode {
+        case .semantic, .keyword:
+            return mode
+        case .withContext(let expand):
+            return .withContext(expand: max(0, expand))
         case .hybrid(let expand, let wBM25):
-            return try engine.searchHybrid(
-                arguments.query,
-                in: arguments.in_,
-                limit: arguments.top_k,
-                expand: expand,
-                wBM25: wBM25
-            )
-        case .keyword:
-            // Approximate pure keyword by using hybrid with full BM25 weight and no expansion
-            return try engine.searchHybrid(
-                arguments.query,
-                in: arguments.in_,
-                limit: arguments.top_k,
-                expand: 0,
-                wBM25: 1.0
-            )
-        case .semantic:
-            // Approximate pure semantic by using hybrid with cosine-only weight
-            return try engine.searchHybrid(
-                arguments.query,
-                in: arguments.in_,
-                limit: arguments.top_k,
-                expand: 1,
-                wBM25: 0.0
-            )
+            let safeExpand = max(0, expand)
+            let safeWeight = max(0.0, min(wBM25, 1.0))
+            return .hybrid(expand: safeExpand, wBM25: safeWeight)
         }
     }
 }
