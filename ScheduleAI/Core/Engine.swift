@@ -116,7 +116,6 @@ public class Engine: ObservableObject {
         sourceId: String,
         name: String? = nil
     ) async throws -> (items: Int, chunks: Int) {
-        // Avoid ingesting empty payloads
         guard !emails.isEmpty else { return (items: 0, chunks: 0) }
         do {
             let iso = ISO8601DateFormatter()

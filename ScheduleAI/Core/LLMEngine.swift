@@ -15,6 +15,7 @@ public enum LLMEngineError: Error, Equatable {
 }
 
 public struct RagSearchTool: Tool {
+    
     public let name = "search_rag"
     public let description: String = "Searches a local RAG database for saved documents"
     
@@ -36,29 +37,66 @@ public struct RagSearchTool: Tool {
         public var top_k: Int = 5
 
         @Guide(
-            description: "Retrieval strategy to use. Common values: 'keyword', 'semantic', or 'hybrid'. Defaults to 'hybrid'."
+            description: "Retrieval strategy to use. Common values: 'keyword', 'semantic', 'withContext', or 'hybrid'. Defaults to 'hybrid'."
         )
-        public var mode: SearchMode = .hybrid(expand: 1, wBM25: 0.5)
+        public var mode: String = "hybrid"
+
+        @Guide(
+            description: "Context window expansion for 'withContext' or 'hybrid'. Non-negative. Defaults to 1.", .range(0...1000)
+        )
+        public var expand: Int = 1
+
+        @Guide(
+            description: "Weight for BM25 in hybrid fusion (0.0 to 1.0). Ignored unless mode is 'hybrid'. Defaults to 0.5.", .range(0.0...1.0)
+        )
+        public var wBM25: Double = 0.5
     }
     
-    public func call(arguments: Arguments) async throws -> [RetrievedResult] {
-        let engine = try await Engine.shared()
-        let sanitizedTopK = max(1, min(arguments.top_k, 25))
-        let mode = sanitize(arguments.mode)
-        return try engine.search(arguments.query, in: arguments.in_, topK: sanitizedTopK, mode: mode)
+    @Generable
+    public struct Output {
+        public var hits: [Hit]
     }
 
-    private func sanitize(_ mode: SearchMode) -> SearchMode {
-        switch mode {
-        case .semantic, .keyword:
-            return mode
-        case .withContext(let expand):
-            return .withContext(expand: max(0, expand))
-        case .hybrid(let expand, let wBM25):
-            let safeExpand = max(0, expand)
-            let safeWeight = max(0.0, min(wBM25, 1.0))
-            return .hybrid(expand: safeExpand, wBM25: safeWeight)
+    @Generable
+    public struct Hit {
+        public var sourceId: String
+        public var startPage: Int?
+        public var excerpt: String
+        public var text: String
+        public var bm25: Double
+        public var cosine: Double?
+        public var score: Double
+    }
+    
+    
+    public func call(arguments: Arguments) async throws -> Output {
+        let engine = try await Engine.shared()
+        let sanitizedTopK = max(1, min(arguments.top_k, 25))
+        let selectedMode: SearchMode = {
+            let m = arguments.mode.lowercased()
+            let clampedExpand = max(0, arguments.expand)
+            let clampedWBM25 = max(0.0, min(arguments.wBM25, 1.0))
+            switch m {
+            case "semantic":
+                return .semantic
+            case "keyword":
+                return .keyword
+            case "withcontext", "context":
+                return .withContext(expand: clampedExpand)
+            case "hybrid":
+                fallthrough
+            default:
+                return .hybrid(expand: clampedExpand, wBM25: clampedWBM25)
+            }
+        }()
+        
+        
+        let results: [RetrievedResult] = try await engine.search(arguments.query, in: arguments.in_, topK: sanitizedTopK, mode: selectedMode)
+
+        let hits = results.map { r in
+            Hit(sourceId: r.sourceId, startPage: r.startPage, excerpt: r.excerpt, text: r.text, bm25: r.bm25, cosine: r.cosine, score: r.score)
         }
+        return Output(hits: hits)
     }
 }
 
