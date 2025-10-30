@@ -33,7 +33,8 @@ public class Engine: ObservableObject {
     public let folio: FolioEngine
     private var ingestConfig: FolioConfig
     public var errorState: EngineError = .none
-    
+    public static let sharedTask: Task<Engine, Error> = Task { await Engine() }
+    public static func shared() async throws -> Engine { try await sharedTask.value }
     
     @discardableResult
     public func importPDF(at url: URL) async throws -> (pages: Int, chunks: Int) {
