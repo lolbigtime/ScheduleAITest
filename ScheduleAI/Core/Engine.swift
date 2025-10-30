@@ -22,10 +22,58 @@ public enum EngineError: Error, Equatable {
     case ingestError
 }
 
-public enum SearchMode {
+public enum SearchMode: Codable, Sendable {
     case semantic
+    case keyword
     case withContext(expand: Int)
     case hybrid(expand: Int, wBM25: Double)
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case expand
+        case wBM25
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+
+        switch type {
+        case "semantic":
+            self = .semantic
+        case "keyword":
+            self = .keyword
+        case "withContext":
+            let expand = try container.decodeIfPresent(Int.self, forKey: .expand) ?? 1
+            self = .withContext(expand: expand)
+        case "hybrid":
+            let expand = try container.decodeIfPresent(Int.self, forKey: .expand) ?? 1
+            let wBM25 = try container.decodeIfPresent(Double.self, forKey: .wBM25) ?? 0.5
+            self = .hybrid(expand: expand, wBM25: wBM25)
+        default:
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath, debugDescription: "Unsupported search mode: \(type)")
+            )
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+
+        switch self {
+        case .semantic:
+            try container.encode("semantic", forKey: .type)
+        case .keyword:
+            try container.encode("keyword", forKey: .type)
+        case .withContext(let expand):
+            try container.encode("withContext", forKey: .type)
+            try container.encode(expand, forKey: .expand)
+        case .hybrid(let expand, let wBM25):
+            try container.encode("hybrid", forKey: .type)
+            try container.encode(expand, forKey: .expand)
+            try container.encode(wBM25, forKey: .wBM25)
+        }
+    }
 }
 
 
@@ -127,14 +175,24 @@ public class Engine: ObservableObject {
     
     @discardableResult
     public func search(_ query: String, in source: String? = nil, topK: Int = 8, mode: SearchMode = .semantic) throws -> [RetrievedResult] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        let limit = max(1, min(topK, 50))
+
         do {
             switch mode {
             case .semantic:
-                return try mapPassagesToResults(self.folio.searchWithContext(query, limit: topK))
+                return try self.folio.searchHybrid(trimmed, in: source, limit: limit, expand: 1, wBM25: 0.0)
+            case .keyword:
+                return try mapPassagesToResults(self.folio.searchWithContext(trimmed, in: source, limit: limit, expand: 0))
             case .withContext(let expand):
-                return try mapPassagesToResults(self.folio.searchWithContext(query, in: source, limit: topK, expand: expand))
+                let safeExpand = max(0, expand)
+                return try mapPassagesToResults(self.folio.searchWithContext(trimmed, in: source, limit: limit, expand: safeExpand))
             case .hybrid(let expand, let wBM25):
-                return try self.folio.searchHybrid(query, in: source, limit: topK, expand: expand, wBM25: wBM25)
+                let safeExpand = max(0, expand)
+                let safeWeight = max(0.0, min(wBM25, 1.0))
+                return try self.folio.searchHybrid(trimmed, in: source, limit: limit, expand: safeExpand, wBM25: safeWeight)
             }
         } catch {
             errorState = .searchError
