@@ -20,6 +20,8 @@ public enum EngineError: Error, Equatable {
     case none
     case searchError
     case ingestError
+    case fetchError
+
 }
 
 public enum SearchMode: Codable, Sendable {
@@ -171,6 +173,20 @@ public class Engine: ObservableObject {
         }
     }
     
+    @discardableResult
+    public func getDocument(sourceId: String, startPage: Int? = nil, anchor: String? = nil, expand: Int = 2, maxChars: Int? = 8000) throws -> DocumentFetch {
+        let safeSource = sourceId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let safeExpand = max(0, expand)
+        let safeMax = maxChars.map { max(200, min($0, 100_000)) }
+        let safeStart = startPage.map { max(1, $0) }
+        
+        do {
+            return try self.folio.fetchDocument(sourceId: safeSource, startPage: safeStart, anchor: anchor, expand: safeExpand, maxChars: safeMax)
+        } catch {
+            errorState = .fetchError
+            throw error
+        }
+    }
     
     @discardableResult
     public func search(_ query: String, in source: String? = nil, topK: Int = 8, mode: SearchMode = .semantic) throws -> [RetrievedResult] {

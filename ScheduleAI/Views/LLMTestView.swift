@@ -154,8 +154,6 @@ struct LLMTestView: View {
         switch segment {
         case .text(let textSegment):
             return textSegment.content
-        case .structured(let structured):
-            return String(describing: structured.content)
         @unknown default:
             return String(describing: segment)
         }

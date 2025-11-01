@@ -100,6 +100,97 @@ public struct RagSearchTool: Tool {
     }
 }
 
+public struct CurrentTimeTool: Tool {
+    public let name = "now"
+    public let description: String = "Fetches the current time for the device."
+    
+    @Generable
+    public struct Arguments { }
+    
+    @Generable
+    public struct Output {
+        public var nowISO: String
+        public var timezone: String
+    }
+    
+    public func call(arguments: Arguments) async throws -> Output {
+        let now = Date()
+        let tz = TimeZone.current
+        let iso = Self.isoFormatter.string(from: now)
+        
+        return Output(nowISO: iso, timezone: tz.identifier)
+    }
+    
+    private static let isoFormatter: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.timeZone = .current
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+}
+
+
+
+public struct GetDocumentTool: Tool {
+    
+    public let name = "get_doc"
+    public let description: String = "Fetch the canonical text for a document identified by sourceId from the local RAG database. Call this only with IDs returned by search_rag."
+    
+     
+    @Generable
+    public struct Arguments {
+        @Guide(description: "The document's sourceId (as returned by search_rag).")
+        public var sourceId: String
+
+        @Guide(description: "Optional starting page (1-based) to anchor the fetch.", .range(1...1_000_000))
+        public var startPage: Int? = nil
+
+        @Guide(description: "Optional short anchor string (e.g., a snippet from a hit) to target a passage near this text.")
+        public var anchor: String? = nil
+
+        @Guide(description: "Neighbor expansion (±chunks) around the anchor/start. Non-negative.", .range(0...8))
+        public var expand: Int = 2
+
+        @Guide(description: "Maximum number of characters to return. Set null to disable. (200–100,000).", .range(200...100_000))
+        public var maxChars: Int? = 8_000
+    }
+
+    @Generable
+    public struct Output {
+        public var sourceId: String
+        public var displayName: String
+        public var startPage: Int?
+        public var endPage: Int?
+        public var text: String
+        public var chunkIds: [String]
+    }
+    
+    
+    public func call(arguments: Arguments) async throws -> Output {
+        let engine = try await Engine.shared()
+
+        let safeExpand = max(0, arguments.expand)
+
+        let fetch = try await engine.getDocument(
+            sourceId: arguments.sourceId,
+            startPage: arguments.startPage,
+            anchor: arguments.anchor,
+            expand: safeExpand,
+            maxChars: arguments.maxChars
+        )
+
+        return Output(
+            sourceId: fetch.sourceId,
+            displayName: fetch.displayName,
+            startPage: fetch.startPage,
+            endPage: fetch.endPage,
+            text: fetch.text,
+            chunkIds: fetch.chunkIds
+        )
+    }
+}
+
+
 
 public class LLMEngine {
     
@@ -110,6 +201,7 @@ public class LLMEngine {
     - When a request involves notes, docs, emails, saved opportunities, or schedule content, FIRST call `search_rag` with a focused query.
     - If specific result IDs look promising, call `get_doc` to expand before drafting.
     - Prefer quoting exact snippets and include a brief “Sources:” list using [sourceId]/titles.
+    - If time data is needed, call "now" to obtain time data.
     - If the query is ambiguous or context is insufficient, ask one short clarifying question rather than guessing.
     - For structured outputs (e.g., checklists/schedules), return valid JSON that conforms to the provided schema.
     - Keep answers brief, on-device, and do not invent facts beyond retrieved context.
@@ -133,7 +225,9 @@ public class LLMEngine {
             let rag = try await Engine.shared()
             let session = LanguageModelSession(
                 tools: [
-                    RagSearchTool()
+                    RagSearchTool(),
+                    GetDocumentTool(),
+                    CurrentTimeTool()
                 ],
                 instructions: LLMEngine.systemPolicy
             )
