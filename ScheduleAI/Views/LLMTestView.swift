@@ -9,7 +9,11 @@ struct LLMTestView: View {
 
     private let sampleNote = "LLM test note: The CS 101 midterm is on Oct 20 at 10am in Hall A."
     private let prompt = """
-    You are verifying tool integration. Please call the search_rag tool to find when the CS 101 midterm is scheduled and then answer in one sentence.
+    You are verifying tool integration. Follow this procedure exactly:
+    1. Call search_rag to locate when the CS 101 midterm happens.
+    2. Call get_doc using one of the returned sourceIds to read the surrounding passage.
+    3. Call now so you can report the current local time.
+    4. Provide one concise sentence that mentions the exam schedule, its location, and the current time.
     """
 
     var body: some View {
@@ -105,18 +109,20 @@ struct LLMTestView: View {
         let response = try await llmEngine.modelSession.respond(to: prompt)
         await appendLog("Model returned response text.")
 
-        let toolCalls = response.transcriptEntries.compactMap { entry -> Transcript.ToolCalls? in
+        let toolCallBatches: [Transcript.ToolCalls] = response.transcriptEntries.compactMap { entry in
             if case .toolCalls(let calls) = entry {
                 return calls
             }
             return nil
         }
 
-        guard let firstToolBatch = toolCalls.first else {
+        let allToolCalls = toolCallBatches.flatMap { $0 }
+
+        guard !allToolCalls.isEmpty else {
             throw LLMTestFailure("Model produced no tool calls.")
         }
 
-        guard let searchCall = firstToolBatch.first(where: { $0.toolName == "search_rag" }) else {
+        guard let searchCall = allToolCalls.first(where: { $0.toolName == "search_rag" }) else {
             throw LLMTestFailure("Model did not invoke search_rag tool.")
         }
 
@@ -136,6 +142,32 @@ struct LLMTestView: View {
         let outputSummary = searchOutput.segments.map(toolSegmentSummary).joined(separator: " ")
         await appendLog("search_rag output: \(outputSummary)")
 
+        guard let getDocCall = allToolCalls.first(where: { $0.toolName == "get_doc" }) else {
+            throw LLMTestFailure("Model did not invoke get_doc tool.")
+        }
+
+        await appendLog("Model invoked get_doc (id=\(getDocCall.id)).")
+
+        guard let getDocOutput = outputs.first(where: { $0.toolName == "get_doc" }) else {
+            throw LLMTestFailure("No tool output recorded for get_doc call.")
+        }
+
+        let getDocSummary = getDocOutput.segments.map(toolSegmentSummary).joined(separator: " ")
+        await appendLog("get_doc output: \(getDocSummary)")
+
+        guard let nowCall = allToolCalls.first(where: { $0.toolName == "now" }) else {
+            throw LLMTestFailure("Model did not invoke now tool.")
+        }
+
+        await appendLog("Model invoked now (id=\(nowCall.id)).")
+
+        guard let nowOutput = outputs.first(where: { $0.toolName == "now" }) else {
+            throw LLMTestFailure("No tool output recorded for now call.")
+        }
+
+        let nowSummary = nowOutput.segments.map(toolSegmentSummary).joined(separator: " ")
+        await appendLog("now output: \(nowSummary)")
+
         let answer = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !answer.isEmpty else {
             throw LLMTestFailure("Model returned empty answer.")
@@ -143,8 +175,17 @@ struct LLMTestView: View {
 
         await appendLog("Model final answer: \(answer)")
 
-        guard answer.lowercased().contains("oct") else {
+        let normalizedAnswer = answer.lowercased()
+        guard normalizedAnswer.contains("oct") else {
             throw LLMTestFailure("Model answer did not reference the expected date.")
+        }
+
+        guard normalizedAnswer.contains("hall") else {
+            throw LLMTestFailure("Model answer did not reference the expected location.")
+        }
+
+        guard normalizedAnswer.contains(":") else {
+            throw LLMTestFailure("Model answer did not include the current time.")
         }
 
         await appendLog("LLM tool integration test complete.")
