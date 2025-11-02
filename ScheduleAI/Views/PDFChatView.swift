@@ -230,15 +230,32 @@ struct PDFChatView: View {
     }
 
     private func buildPrompt(from history: [ChatMessage]) -> String {
-        if history.isEmpty { return "" }
-        let segments = history.map { message -> String in
+        guard !history.isEmpty else { return "" }
+
+        let maxCharacters = 10_000
+        var collected: [String] = []
+        var total = 0
+
+        for message in history.reversed() {
+            let segment: String
             switch message.role {
             case .user:
-                return "User: \(message.text)"
+                segment = "User: \(message.text)"
             case .assistant:
-                return "Assistant: \(message.text)"
+                segment = "Assistant: \(message.text)"
             }
+
+            let separatorCount = collected.isEmpty ? 0 : 2
+            let candidateTotal = total + segment.count + separatorCount
+            if candidateTotal > maxCharacters, !collected.isEmpty {
+                break
+            }
+
+            collected.append(segment)
+            total = min(candidateTotal, maxCharacters)
         }
-        return segments.joined(separator: "\n\n") + "\n\nAssistant:"
+
+        let ordered = collected.reversed().joined(separator: "\n\n")
+        return ordered + "\n\nAssistant:"
     }
 }
