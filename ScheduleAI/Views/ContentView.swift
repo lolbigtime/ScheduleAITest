@@ -101,6 +101,18 @@ struct ContentView: View {
                     Divider()
 
                     Group {
+                        Text("Chat").font(.headline)
+                        NavigationLink {
+                            PDFChatView()
+                        } label: {
+                            Label("Chat over PDFs", systemImage: "bubble.left.and.bubble.right")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+
+                    Divider()
+
+                    Group {
                         Text("Diagnostics").font(.headline)
                         NavigationLink {
                             HealthCheckView()
